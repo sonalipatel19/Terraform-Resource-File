@@ -1,0 +1,136 @@
+# Starter pipeline
+
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- d
+
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+  - stage: 'TerraformToolInstaller'
+    displayName: 'Terraform Tool Installer'
+    jobs:
+      - job: 'terraformInstall'
+        displayName: 'Install Terraform Tool'
+
+        steps:
+          - task: TerraformInstaller@1
+            displayName: 'Terraform Installer'
+            inputs:
+              terraformVersion: 'latest'
+          - task: TerraformTask@5
+            displayName: 'Terraform Init'
+            inputs:
+              provider: 'azurerm'
+              command: 'init'
+              backendServiceArm: 'terraform'
+              backendAzureRmResourceGroupName: 'demo'
+              backendAzureRmStorageAccountName: 'azstorage1b'
+              backendAzureRmContainerName: 'terraform-files'
+              backendAzureRmKey: 'terraform.tfstate'
+              
+  - stage: 'TerraformValidatePlan'
+    displayName: 'Terraform Validate Plan'
+    condition: succeeded('TerraformToolInstaller')
+    dependsOn: 'TerraformToolInstaller'
+    jobs:
+      - job: 'TerraformValidatePlan'
+        displayName: 'Terraform Validate Plan'       
+        steps:
+          - task: TerraformInstaller@1
+            displayName: 'Terraform Installer'
+            inputs:
+              terraformVersion: 'latest'
+
+          - task: TerraformTask@5
+            displayName: 'Terraform Init'
+            inputs:
+              provider: 'azurerm'
+              command: 'init'
+              backendServiceArm: 'terraform'
+              backendAzureRmResourceGroupName: 'demo'
+              backendAzureRmStorageAccountName: 'azstorage1b'
+              backendAzureRmContainerName: 'terraform-files'
+              backendAzureRmKey: 'terraform.tfstate'
+          - task: TerraformTask@5
+            displayName: 'Terraform Validate'
+            inputs:
+              provider: 'azurerm'
+              command: 'validate' 
+            
+          - task: TerraformTask@5
+            displayName: 'Terraform Plan'
+            inputs:
+              provider: 'azurerm'
+              command: 'plan'
+              environmentServiceNameAzureRM: 'terraform'
+
+  - stage: 'TerraformApply'
+    displayName: 'Terraform Apply'
+    dependsOn: 'TerraformValidatePlan'
+    jobs:
+      - deployment: 'terraformApply' 
+        displayName: 'Terraform Apply' 
+        environment: 'terraform-apply' 
+        strategy:
+          runOnce:
+           deploy:  
+            steps:  
+              - task: TerraformInstaller@1
+                displayName: 'Terraform Installer'
+                inputs:
+                  terraformVersion: 'latest'
+
+              - task: TerraformTask@5
+                displayName: 'Terraform Init'
+                inputs:
+                  provider: 'azurerm'
+                  command: 'init'
+                  backendServiceArm: 'terraform'
+                  backendAzureRmResourceGroupName: 'demo'
+                  backendAzureRmStorageAccountName: 'azstorage1b'
+                  backendAzureRmContainerName: 'terraform-files'
+                  backendAzureRmKey: 'terraform.tfstate'        
+              - task: TerraformTask@5
+                displayName: 'Terraform Apply'
+                inputs:
+                  provider: 'azurerm'
+                  command: 'apply'
+                  environmentServiceNameAzureRM: 'terraform'
+
+
+  - stage: 'TerraformDestroy'    
+    displayName: 'Terraform Destroy'     
+     
+    jobs:
+      - job: 'TerraformDestroy'
+        displayName: 'Terraform Destroy'
+        steps:
+          - task: TerraformInstaller@1
+            displayName: 'Terraform Installer'
+            inputs:
+              terraformVersion: 'latest'
+
+          - task: TerraformTask@5
+            displayName: 'Terraform Init'
+            inputs:
+              provider: 'azurerm'
+              command: 'init'
+              backendServiceArm: 'terraform'
+              backendAzureRmResourceGroupName: 'demo'
+              backendAzureRmStorageAccountName: 'azstorage1b'
+              backendAzureRmContainerName: 'terraform-files'
+              backendAzureRmKey: 'terraform.tfstate'
+
+          - task: TerraformTask@5
+            displayName: 'Terraform Destroy'
+            inputs:
+              provider: 'azurerm'
+              command: 'destroy'
+              commandOptions: '--auto-approve'
+              environmentServiceNameAzureRM: 'terraform'
+
